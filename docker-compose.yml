@@ -1,0 +1,10 @@
+version: "3"
+services:
+  app:
+    build: .
+    env_file:
+      - .env
+    entrypoint: sh
+    tty: true
+    volumes:
+      - ./src:/opt/src
