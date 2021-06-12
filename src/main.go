@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -21,11 +20,26 @@ func init() {
 	}
 }
 
+type Issue struct {
+	Publisher   int
+	Publication int
+	Issue       int
+}
+
+var buckets = map[string]func(Issue) string{
+	"media.magtab.com": func(issue Issue) string {
+		return fmt.Sprintf("%d/%d/%d", issue.Publisher, issue.Publication, issue.Issue)
+	},
+	"revistas.magtab.com": func(issue Issue) string {
+		return fmt.Sprintf("%d/%d/%d", issue.Publisher, issue.Publication, issue.Issue)
+	},
+}
+
 func main() {
 	awsConfig := getAWSConfig()
 	ociConfig := getOCIConfig()
-	prefix := "9/17/21650"
-	sync(awsConfig, ociConfig, prefix)
+	issue := Issue{Publisher: 9, Publication: 17, Issue: 21650}
+	sync(awsConfig, ociConfig, issue)
 }
 
 func getOCIConfig() aws.Config {
@@ -68,17 +82,17 @@ func getAWSConfig() aws.Config {
 	return config
 }
 
-func sync(awsConfig aws.Config, ociConfig aws.Config, prefix string) {
-	buckets := strings.Split(os.Getenv("BUCKETS"), ",")
-	for _, bucketName := range buckets {
-		iterObjects(bucketName, ociConfig, prefix)
-		iterObjects(bucketName, awsConfig, prefix)
+func sync(awsConfig aws.Config, ociConfig aws.Config, issue Issue) {
+	for bucketName, prefixFunc := range buckets {
+		prefix := prefixFunc(issue)
+		iterObjects(ociConfig, bucketName, prefix)
+		iterObjects(awsConfig, bucketName, prefix)
 	}
 }
 
-func iterObjects(bucketName string, config aws.Config, prefix string) {
-	// filter := "editoras/278/titulos/548/edicoes"
-	fmt.Println("Object:", prefix)
+func iterObjects(config aws.Config, bucketName string, prefix string) {
+	fmt.Println("Prefix:", prefix)
+
 	client := s3.NewFromConfig(config)
 	params := &s3.ListObjectsV2Input{Bucket: &bucketName, Prefix: &prefix}
 	paginator := s3.NewListObjectsV2Paginator(client, params, func(o *s3.ListObjectsV2PaginatorOptions) {
