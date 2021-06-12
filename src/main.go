@@ -46,10 +46,10 @@ func main() {
 }
 
 func getOCIConfig() aws.Config {
-	accessKey := os.Getenv("DEST_ACCESS_KEY")
-	secretKey := os.Getenv("DEST_SECRET_KEY")
-	endpointURL := os.Getenv("DEST_ENDPOINT_URL")
-	region := os.Getenv("DEST_REGION")
+	accessKey := os.Getenv("OCI_ACCESS_KEY")
+	secretKey := os.Getenv("OCI_SECRET_KEY")
+	endpointURL := os.Getenv("OCI_ENDPOINT_URL")
+	region := os.Getenv("OCI_REGION")
 
 	customResolver := aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
 		return aws.Endpoint{
@@ -71,9 +71,9 @@ func getOCIConfig() aws.Config {
 }
 
 func getAWSConfig() aws.Config {
-	accessKey := os.Getenv("SOURCE_ACCESS_KEY")
-	secretKey := os.Getenv("SOURCE_SECRET_KEY")
-	region := os.Getenv("SOURCE_REGION")
+	accessKey := os.Getenv("AWS_ACCESS_KEY")
+	secretKey := os.Getenv("AWS_SECRET_KEY")
+	region := os.Getenv("AWS_REGION")
 
 	config, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
