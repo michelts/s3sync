@@ -156,37 +156,40 @@ func copyObjects(clients Clients, bucketName string, input <-chan string) <-chan
 	output := make(chan string)
 	go func() {
 		for key := range input {
-			requestInput := s3.GetObjectInput{
-				Bucket: &bucketName,
-				Key:    &key,
-			}
-
 			reader, writer := io.Pipe()
-
-			downloader := manager.NewDownloader(clients.OCI)
-			downloader.Concurrency = 1
-			go func() {
-				defer writer.Close()
-				downloader.Download(context.TODO(), FakeWriterAt{writer}, &requestInput)
-			}()
-
-			uploadInput := s3.PutObjectInput{
-				Bucket: &bucketName,
-				Key:    &key,
-				Body:   reader,
-			}
-			manager.NewUploader(clients.AWS)
-			uploader := manager.NewUploader(clients.AWS)
-			_, err := uploader.Upload(context.TODO(), &uploadInput)
-			if err != nil {
-				log.Fatalf("failed to upload key %s", key)
-			}
+			downloadFile(clients.OCI, writer, bucketName, key)
+			uploadFile(clients.AWS, reader, bucketName, key)
 			output <- fmt.Sprintf("Processed %s", key)
 		}
 		close(output)
 	}()
 	return output
+}
 
+func downloadFile(client *s3.Client, writer *io.PipeWriter, bucketName string, key string) {
+	requestInput := s3.GetObjectInput{
+		Bucket: &bucketName,
+		Key:    &key,
+	}
+	downloader := manager.NewDownloader(client)
+	downloader.Concurrency = 1
+	go func() {
+		defer writer.Close()
+		downloader.Download(context.TODO(), FakeWriterAt{writer}, &requestInput)
+	}()
+}
+
+func uploadFile(client *s3.Client, reader *io.PipeReader, bucketName string, key string) {
+	uploadInput := s3.PutObjectInput{
+		Bucket: &bucketName,
+		Key:    &key,
+		Body:   reader,
+	}
+	uploader := manager.NewUploader(client)
+	_, err := uploader.Upload(context.TODO(), &uploadInput)
+	if err != nil {
+		log.Fatalf("failed to upload key %s", key)
+	}
 }
 
 // Clients group AWS and OCI clients
