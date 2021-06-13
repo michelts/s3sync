@@ -35,10 +35,12 @@ var buckets = map[string]func(Issue) string{
 }
 
 func main() {
-	awsConfig := getAWSConfig()
-	ociConfig := getOCIConfig()
+	clients := Clients{
+		AWS: getAWSClient(getAWSConfig()),
+		OCI: getAWSClient(getOCIConfig()),
+	}
 	issue := Issue{Publisher: 9, Publication: 17, Issue: 21650}
-	copyIssueFiles(awsConfig, ociConfig, issue)
+	copyIssueFiles(clients, issue)
 }
 
 func getOCIConfig() aws.Config {
@@ -81,14 +83,18 @@ func getAWSConfig() aws.Config {
 	return config
 }
 
-func copyIssueFiles(awsConfig aws.Config, ociConfig aws.Config, issue Issue) {
+func getAWSClient(config aws.Config) *s3.Client {
+	return s3.NewFromConfig(config)
+}
+
+func copyIssueFiles(clients Clients, issue Issue) {
 	for bucketName, prefixFunc := range buckets {
 		prefix := prefixFunc(issue)
-		ociItems := getObjectKeys(ociConfig, bucketName, prefix)
+		ociItems := getObjectKeys(clients.OCI, bucketName, prefix)
 		fmt.Println("=", bucketName)
-		copier1 := copyObjects(ociConfig, awsConfig, bucketName, ociItems)
-		copier2 := copyObjects(ociConfig, awsConfig, bucketName, ociItems)
-		copier3 := copyObjects(ociConfig, awsConfig, bucketName, ociItems)
+		copier1 := copyObjects(clients, bucketName, ociItems)
+		copier2 := copyObjects(clients, bucketName, ociItems)
+		copier3 := copyObjects(clients, bucketName, ociItems)
 		for item := range mergeCopiers(copier1, copier2, copier3) {
 			fmt.Println("Input", item)
 		}
@@ -117,8 +123,7 @@ func mergeCopiers(channels ...<-chan string) <-chan string {
 	return output
 }
 
-func getObjectKeys(config aws.Config, bucketName string, prefix string) <-chan string {
-	client := s3.NewFromConfig(config)
+func getObjectKeys(client *s3.Client, bucketName string, prefix string) <-chan string {
 	params := &s3.ListObjectsV2Input{Bucket: &bucketName, Prefix: &prefix}
 	paginator := s3.NewListObjectsV2Paginator(client, params, func(o *s3.ListObjectsV2PaginatorOptions) {
 		o.Limit = hardLimit
@@ -147,9 +152,7 @@ func getObjectKeys(config aws.Config, bucketName string, prefix string) <-chan s
 	return channel
 }
 
-func copyObjects(ociConfig aws.Config, awsConfig aws.Config, bucketName string, input <-chan string) <-chan string {
-	ociClient := s3.NewFromConfig(ociConfig)
-	awsClient := s3.NewFromConfig(awsConfig)
+func copyObjects(clients Clients, bucketName string, input <-chan string) <-chan string {
 	output := make(chan string)
 	go func() {
 		for key := range input {
@@ -160,7 +163,7 @@ func copyObjects(ociConfig aws.Config, awsConfig aws.Config, bucketName string, 
 
 			reader, writer := io.Pipe()
 
-			downloader := manager.NewDownloader(ociClient)
+			downloader := manager.NewDownloader(clients.OCI)
 			downloader.Concurrency = 1
 			go func() {
 				defer writer.Close()
@@ -172,8 +175,8 @@ func copyObjects(ociConfig aws.Config, awsConfig aws.Config, bucketName string, 
 				Key:    &key,
 				Body:   reader,
 			}
-			manager.NewUploader(awsClient)
-			uploader := manager.NewUploader(awsClient)
+			manager.NewUploader(clients.AWS)
+			uploader := manager.NewUploader(clients.AWS)
 			_, err := uploader.Upload(context.TODO(), &uploadInput)
 			if err != nil {
 				log.Fatalf("failed to upload key %s", key)
@@ -184,6 +187,12 @@ func copyObjects(ociConfig aws.Config, awsConfig aws.Config, bucketName string, 
 	}()
 	return output
 
+}
+
+// Clients group AWS and OCI clients
+type Clients struct {
+	AWS *s3.Client
+	OCI *s3.Client
 }
 
 // Issue is defined by integer Publisher ID, Publication ID and Issue ID.
