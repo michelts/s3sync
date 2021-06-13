@@ -1,4 +1,4 @@
 FROM golang:alpine
-ADD src/ /opt/src/
 WORKDIR /opt/src/
+ADD src/ /opt/src/
 RUN go install

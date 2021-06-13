@@ -1,9 +1,8 @@
-module s3sync
+module copier
 
-go 1.16
+go 1.13
 
 require (
-	copier v0.0.0-00010101000000-000000000000
 	github.com/aws/aws-sdk-go-v2 v1.6.0
 	github.com/aws/aws-sdk-go-v2/config v1.3.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.2.1
@@ -11,5 +10,3 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.10.0
 	github.com/joho/godotenv v1.3.0
 )
-
-replace copier => ./copier
