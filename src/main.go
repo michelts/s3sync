@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"path"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,17 +16,13 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var hardLimit int32 = 6
+
 func init() {
 	err := godotenv.Load()
 	if err != nil {
 		fmt.Println("Ignoring missing .env file")
 	}
-}
-
-type Issue struct {
-	Publisher   int
-	Publication int
-	Issue       int
 }
 
 var buckets = map[string]func(Issue) string{
@@ -90,27 +86,20 @@ func copyIssueFiles(awsConfig aws.Config, ociConfig aws.Config, issue Issue) {
 		prefix := prefixFunc(issue)
 		ociItems := getObjectKeys(ociConfig, bucketName, prefix)
 		fmt.Println("=", bucketName)
-		fmt.Println("- OCI Items")
-		copier1 := copyObjects(ociConfig, bucketName, ociItems)
-		copier2 := copyObjects(ociConfig, bucketName, ociItems)
-		copier3 := copyObjects(ociConfig, bucketName, ociItems)
-		for x := range merge(copier1, copier2, copier3) {
-			fmt.Println(x)
+		copier1 := copyObjects(ociConfig, awsConfig, bucketName, ociItems)
+		copier2 := copyObjects(ociConfig, awsConfig, bucketName, ociItems)
+		copier3 := copyObjects(ociConfig, awsConfig, bucketName, ociItems)
+		for item := range mergeCopiers(copier1, copier2, copier3) {
+			fmt.Println("Input", item)
 		}
-
-		//awsItems := getObjectKeys(awsConfig, bucketName, prefix)
-		//fmt.Println("- AWS Items")
-		//for x := range awsItems {
-		//	fmt.Println(x)
-		//}
 	}
 }
 
-func merge(channels ...<-chan os.File) <-chan os.File {
+func mergeCopiers(channels ...<-chan string) <-chan string {
 	var waitGroup sync.WaitGroup
-	output := make(chan os.File)
+	output := make(chan string)
 
-	partialOutput := func(channel <-chan os.File) {
+	partialOutput := func(channel <-chan string) {
 		for key := range channel {
 			output <- key
 		}
@@ -132,7 +121,7 @@ func getObjectKeys(config aws.Config, bucketName string, prefix string) <-chan s
 	client := s3.NewFromConfig(config)
 	params := &s3.ListObjectsV2Input{Bucket: &bucketName, Prefix: &prefix}
 	paginator := s3.NewListObjectsV2Paginator(client, params, func(o *s3.ListObjectsV2PaginatorOptions) {
-		o.Limit = 10
+		o.Limit = hardLimit
 	})
 	channel := make(chan string)
 	go func() {
@@ -145,7 +134,6 @@ func getObjectKeys(config aws.Config, bucketName string, prefix string) <-chan s
 				log.Fatalf("failed to get page %v, %v", i, err)
 			}
 
-			// Log the objects found
 			for _, obj := range page.Contents {
 				channel <- *obj.Key
 			}
@@ -159,27 +147,58 @@ func getObjectKeys(config aws.Config, bucketName string, prefix string) <-chan s
 	return channel
 }
 
-func copyObjects(config aws.Config, bucketName string, input <-chan string) <-chan os.File {
-	client := s3.NewFromConfig(config)
-	output := make(chan os.File)
+func copyObjects(ociConfig aws.Config, awsConfig aws.Config, bucketName string, input <-chan string) <-chan string {
+	ociClient := s3.NewFromConfig(ociConfig)
+	awsClient := s3.NewFromConfig(awsConfig)
+	output := make(chan string)
 	go func() {
 		for key := range input {
 			requestInput := s3.GetObjectInput{
 				Bucket: &bucketName,
 				Key:    &key,
 			}
-			pathToFile := os.TempDir() + "/" + path.Base(key)
-			fmt.Println(pathToFile)
-			f, _ := os.Create(pathToFile)
-			downloader := manager.NewDownloader(client)
-			_, err := downloader.Download(context.TODO(), f, &requestInput)
-			if err != nil {
-				log.Fatalf("failed to download %s", key)
+
+			reader, writer := io.Pipe()
+
+			downloader := manager.NewDownloader(ociClient)
+			downloader.Concurrency = 1
+			go func() {
+				defer writer.Close()
+				downloader.Download(context.TODO(), FakeWriterAt{writer}, &requestInput)
+			}()
+
+			uploadInput := s3.PutObjectInput{
+				Bucket: &bucketName,
+				Key:    &key,
+				Body:   reader,
 			}
-			output <- *f
+			manager.NewUploader(awsClient)
+			uploader := manager.NewUploader(awsClient)
+			_, err := uploader.Upload(context.TODO(), &uploadInput)
+			if err != nil {
+				log.Fatalf("failed to upload key %s", key)
+			}
+			output <- fmt.Sprintf("Processed %s", key)
 		}
 		close(output)
 	}()
 	return output
 
+}
+
+// Issue is defined by integer Publisher ID, Publication ID and Issue ID.
+type Issue struct {
+	Publisher   int
+	Publication int
+	Issue       int
+}
+
+// FakeWriterAt implements a fake WriteAt method for synchronous writes, so we would be able to read/write S3 files from/to memory
+type FakeWriterAt struct {
+	w io.Writer
+}
+
+// WriteAt method ignores the *offset* because we forced sequential downloads
+func (fw FakeWriterAt) WriteAt(p []byte, offset int64) (n int, err error) {
+	return fw.w.Write(p)
 }
