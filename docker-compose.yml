@@ -21,7 +21,7 @@ services:
     image: prod
     env_file:
       - .env
-    entrypoint: /opt/src/s3sync
+    entrypoint: /opt/app/goapp
     tty: true
     ports:
       - 5000:5000
