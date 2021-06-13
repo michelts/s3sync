@@ -15,12 +15,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-var hardLimit int32 = 6
+var pageLimit int32 = 1000
 
 var buckets = map[string]func(Issue) string{
-	//"media.magtab.com": func(issue Issue) string {
-	//	return fmt.Sprintf("editoras/%d/titulos/%d/edicoes/%d", issue.Publisher, issue.Publication, issue.Issue)
-	//},
+	"media.magtab.com": func(issue Issue) string {
+		return fmt.Sprintf("editoras/%d/titulos/%d/edicoes/%d", issue.Publisher, issue.Publication, issue.Issue)
+	},
 	"revistas.magtab.com": func(issue Issue) string {
 		return fmt.Sprintf("%d/%d/%d", issue.Publisher, issue.Publication, issue.Issue)
 	},
@@ -118,25 +118,18 @@ func mergeCopiers(channels ...<-chan string) <-chan string {
 func getObjectKeys(client *s3.Client, bucketName string, prefix string) <-chan string {
 	params := &s3.ListObjectsV2Input{Bucket: &bucketName, Prefix: &prefix}
 	paginator := s3.NewListObjectsV2Paginator(client, params, func(o *s3.ListObjectsV2PaginatorOptions) {
-		o.Limit = hardLimit
+		o.Limit = pageLimit
 	})
 	channel := make(chan string)
 	go func() {
-		var i int
 		for paginator.HasMorePages() {
-			i++
-
 			page, err := paginator.NextPage(context.TODO())
 			if err != nil {
-				log.Fatalf("failed to get page %v, %v", i, err)
+				log.Fatalf("failed to get page %v", err)
 			}
 
 			for _, obj := range page.Contents {
 				channel <- *obj.Key
-			}
-
-			if i > 0 {
-				break
 			}
 		}
 		close(channel)

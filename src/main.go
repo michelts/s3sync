@@ -19,9 +19,9 @@ func copyIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	issueName := fmt.Sprintf("Issue{Publisher %d, Publication %d, Issue %d}", payload.Publisher, payload.Publication, payload.Issue)
 	fmt.Println("Start", issueName)
 	copier.Copy(payload)
-	issueName := fmt.Sprintf("Issue{Publisher %d, Publication %d, Issue %d}", payload.Publisher, payload.Publication, payload.Issue)
 	fmt.Fprintf(w, "OK")
 	fmt.Println("Done", issueName)
 }
