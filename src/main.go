@@ -26,9 +26,14 @@ func copyIssue(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Done", issueName)
 }
 
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "OK")
+}
+
 func handleRequests() {
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", copyIssue).Methods("POST")
+	router.HandleFunc("/ht/", healthCheck).Methods("GET")
 	log.Fatal(http.ListenAndServe(":5000", router))
 }
 

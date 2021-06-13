@@ -1,11 +1,27 @@
 version: "3"
 services:
-  app:
-    build: .
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: dev
     env_file:
       - .env
     entrypoint: sh
-    # entrypoint: go run main.go
+    tty: true
+    ports:
+      - 5000:5000
+    volumes:
+      - ./src:/opt/src
+
+  prod:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: prod
+    env_file:
+      - .env
+    entrypoint: /opt/src/s3sync
     tty: true
     ports:
       - 5000:5000
