@@ -17,12 +17,30 @@ import (
 
 var pageLimit int32 = 1000
 
-var buckets = map[string]func(Issue) string{
-	"media.magtab.com": func(issue Issue) string {
-		return fmt.Sprintf("editoras/%d/titulos/%d/edicoes/%d", issue.Publisher, issue.Publication, issue.Issue)
+// CopySource defines the bucket name and how to parse this prefix, given an issue
+type CopySource struct {
+	BucketName string
+	PrefixFunc func(Issue) string
+}
+
+var buckets = []CopySource{
+	CopySource{
+		BucketName: "media.magtab.com",
+		PrefixFunc: func(issue Issue) string {
+			return fmt.Sprintf("editoras/%d/titulos/%d/edicoes/%d", issue.Publisher, issue.Publication, issue.Issue)
+		},
 	},
-	"revistas.magtab.com": func(issue Issue) string {
-		return fmt.Sprintf("%d/%d/%d", issue.Publisher, issue.Publication, issue.Issue)
+	CopySource{
+		BucketName: "revistas.magtab.com",
+		PrefixFunc: func(issue Issue) string {
+			return fmt.Sprintf("%d/%d/%d", issue.Publisher, issue.Publication, issue.Issue)
+		},
+	},
+	CopySource{
+		BucketName: "revistas.magtab.com",
+		PrefixFunc: func(issue Issue) string {
+			return fmt.Sprintf("%d/%d/Titulo.json", issue.Publisher, issue.Publication)
+		},
 	},
 }
 
@@ -80,13 +98,13 @@ func getAWSClient(config aws.Config) *s3.Client {
 }
 
 func copyIssueFiles(clients Clients, issue Issue) {
-	for bucketName, prefixFunc := range buckets {
-		prefix := prefixFunc(issue)
-		ociItems := getObjectKeys(clients.OCI, bucketName, prefix)
-		fmt.Println("=", bucketName)
-		copier1 := copyObjects(clients, bucketName, ociItems)
-		copier2 := copyObjects(clients, bucketName, ociItems)
-		copier3 := copyObjects(clients, bucketName, ociItems)
+	for _, item := range buckets {
+		prefix := item.PrefixFunc(issue)
+		ociItems := getObjectKeys(clients.OCI, item.BucketName, prefix)
+		fmt.Println("=", item.BucketName)
+		copier1 := copyObjects(clients, item.BucketName, ociItems)
+		copier2 := copyObjects(clients, item.BucketName, ociItems)
+		copier3 := copyObjects(clients, item.BucketName, ociItems)
 		for item := range mergeCopiers(copier1, copier2, copier3) {
 			fmt.Println("Input", item)
 		}
