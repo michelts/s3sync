@@ -26,12 +26,12 @@ var buckets = map[string]func(Issue) string{
 	},
 }
 
-func Copy() {
+// Copy files from OCI to AWS buckets
+func Copy(issue Issue) {
 	clients := Clients{
 		AWS: getAWSClient(getAWSConfig()),
 		OCI: getAWSClient(getOCIConfig()),
 	}
-	issue := Issue{Publisher: 9, Publication: 17, Issue: 21650}
 	copyIssueFiles(clients, issue)
 }
 
