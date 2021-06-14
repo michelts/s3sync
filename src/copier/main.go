@@ -25,12 +25,6 @@ type CopySource struct {
 
 var buckets = []CopySource{
 	CopySource{
-		BucketName: "media.magtab.com",
-		PrefixFunc: func(issue Issue) string {
-			return fmt.Sprintf("editoras/%d/titulos/%d/edicoes/%d", issue.Publisher, issue.Publication, issue.Issue)
-		},
-	},
-	CopySource{
 		BucketName: "revistas.magtab.com",
 		PrefixFunc: func(issue Issue) string {
 			return fmt.Sprintf("%d/%d/%d", issue.Publisher, issue.Publication, issue.Issue)
