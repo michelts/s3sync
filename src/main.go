@@ -32,8 +32,9 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 
 func handleRequests() {
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/", copyIssue).Methods("POST")
 	router.HandleFunc("/ht/", healthCheck).Methods("GET")
+	router.HandleFunc("/cp/", copyIssue).Methods("POST")
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
 	log.Fatal(http.ListenAndServe(":5000", router))
 }
 

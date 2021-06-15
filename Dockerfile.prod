@@ -4,7 +4,15 @@ WORKDIR /opt/src/
 RUN go get -d -v
 RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o goapp
 
+FROM node:lts-alpine as frontend
+ADD frontend /opt/src/
+WORKDIR /opt/src/
+RUN npm install
+RUN npm run build
+RUN npm run export
+
 FROM alpine
 COPY --from=builder /opt/src/goapp /opt/app/
+COPY --from=frontend /opt/src/out /opt/app/static/
 WORKDIR /opt/app/
 ENTRYPOINT ./goapp
