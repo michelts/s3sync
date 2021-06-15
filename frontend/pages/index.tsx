@@ -1,11 +1,18 @@
+import { useCallback } from 'react';
 import Head from 'next/head'
 import Image from 'next/image'
-import styles from '../styles/Home.module.css'
+import csvParse from 'csv-parse/lib/sync'
+import { useAtom } from 'jotai'
+import { itemsAtom } from '../store'
+import CSVImport from './CSVImport'
+import Items from './Items'
 
 export default function Home(): React.FC {
-  return (
-    <div>
-      Test
-    </div>
-  )
+  const [items] = useAtom(itemsAtom);
+
+  if(!items?.length) {
+    return <CSVImport />
+  }
+
+  return <Items />
 }
