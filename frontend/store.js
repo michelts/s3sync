@@ -10,12 +10,12 @@ export const setItemsAtom = atom(
       const [publisher, publication, issue] = values[index];
       set(
         itemsAtom,
-        values.map((item, itemIndex) => (itemIndex === index) ? [...item.slice(0, 2), 'pending'] : item),
+        get(itemsAtom).map((item, itemIndex) => (itemIndex === index) ? [...item.slice(0, 3), 'pending'] : item),
       )
-      await new Promise(resolve => setTimeout(resolve, 300))
+      await new Promise(resolve => setTimeout(resolve, 1000))
       set(
         itemsAtom,
-        values.map((item, itemIndex) => (itemIndex === index) ? [...item.slice(0, 2), 'done'] : item),
+        get(itemsAtom).map((item, itemIndex) => (itemIndex === index) ? [...item.slice(0, 3), 'done'] : item),
       )
     }
   }

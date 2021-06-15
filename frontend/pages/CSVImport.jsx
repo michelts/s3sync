@@ -6,16 +6,16 @@ import { useAtom } from 'jotai';
 import { setItemsAtom } from '../store';
 import styles from '../styles/Home.module.css'
 
-export default function CSVImport(): React.FC {
+export default function CSVImport() {
   const [, setItems] = useAtom(setItemsAtom);
   let reader;
 
-  const handleFileRead = (event: Event) => {
+  const handleFileRead = (event) => {
     const parsed = csvParse(reader.result);
     setItems(parsed);
   }
 
-  const handleChange = useCallback((event: Event) => {
+  const handleChange = useCallback((event) => {
     const file = event.target.files[0];
     reader = new FileReader();
     reader.onloadend = handleFileRead;

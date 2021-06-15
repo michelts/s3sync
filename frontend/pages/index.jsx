@@ -7,7 +7,7 @@ import { itemsAtom } from '../store'
 import CSVImport from './CSVImport'
 import Items from './Items'
 
-export default function Home(): React.FC {
+export default function Home() {
   const [items] = useAtom(itemsAtom);
 
   if(!items?.length) {
